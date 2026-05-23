@@ -1,6 +1,5 @@
 #include QMK_KEYBOARD_H
 #include <string.h>
-#include "transactions.h"
 
 // --- 関数プロトタイプ宣言 ---
 void user_transport_update(void);
@@ -47,7 +46,7 @@ static void set_last(const char *s) {
   }
 }
 
-// 変更があった時だけ送信する（元の関数名 transaction_rpc_send に復元）
+// 変更があった時だけ送信する
 void user_transport_update(void) {
     if (is_keyboard_master()) {
         // 現在の状態を取得
@@ -59,7 +58,7 @@ void user_transport_update(void) {
         // 前回送信したデータと比較し、変化があれば送信 (通信負荷を減らすため)
         if (memcmp(&oled_sync_data, &new_data, sizeof(oled_sync_data_t)) != 0) {
             memcpy(&oled_sync_data, &new_data, sizeof(oled_sync_data_t));
-            // 元の正しい関数・引数に戻す ⬇️
+            // クラウド環境向けの安全な通信関数
             transaction_rpc_send(RPC_SYNC_OLED, sizeof(oled_sync_data), &oled_sync_data);
         }
     }
@@ -464,9 +463,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   )
 };
 
-// 元の記述に復元 (キャスト無しの純粋な登録)
 void keyboard_post_init_user(void) {
-    // RPC_SYNC_OLED というIDの通信が来たら、user_transport_sync 関数を実行するように登録
+    // 最新QMK互換の安全なRPC登録処理
     transaction_register_rpc(RPC_SYNC_OLED, user_transport_sync);
 }
 
@@ -486,7 +484,6 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 
 // --- 8. OLED描画処理 ---
 #ifdef OLED_ENABLE
-// 四角形描画 (true=白, false=黒)
 static void draw_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool color) {
   for (uint8_t i = 0; i < w; i++) {
     for (uint8_t j = 0; j < h; j++) {
@@ -504,11 +501,9 @@ static oled_state_t get_oled_state(void) {
   oled_state_t s;
 
   if (is_keyboard_master()) {
-      // メイン側：自分の状態をそのまま使う
       s.layer = get_highest_layer(layer_state);
       s.mods  = get_mods() | get_oneshot_mods();
   } else {
-      // サブ側：受信したデータ(oled_sync_data)を使う
       s.layer = oled_sync_data.layer;
       s.mods  = oled_sync_data.mods;
   }
@@ -532,7 +527,6 @@ static void write_mod_scag(uint8_t mods) {
   oled_write_P(mods & MOD_MASK_GUI   ? PSTR("G") : PSTR("_"), false);
 }
 
-// 共通レンダリング関数
 static void render_status(const oled_state_t *s) {
   oled_set_cursor(0, 0);
   oled_write_P(PSTR("Patra"), false);
@@ -549,7 +543,7 @@ static void render_status(const oled_state_t *s) {
     if (i == s->layer) {
       draw_rect(24, y, 8, 8, true);
     } else {
-      draw_rect(24, y, 6, 8, false); // 前の表示を消す
+      draw_rect(24, y, 6, 8, false);
       draw_rect(30, y, 2, 8, true);
     }
   }
@@ -567,12 +561,11 @@ static void render_status(const oled_state_t *s) {
 
 bool oled_task_user(void) {
   oled_state_t s = get_oled_state();
-  render_status(&s); // 左右共通で同じ内容を表示
+  render_status(&s);
   return false;
 }
 #endif // OLED_ENABLE
 
-// --- 9. キー判定時間の調整 ---
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
   switch (keycode) {
     case LT(1, KC_SPC):
