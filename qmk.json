@@ -1,4 +1,12 @@
 {
-    "userspace_version": "1.0",
-    "build_targets": []
+    "features": {
+        "userspace": {
+            "targets": [
+                {
+                    "keyboard": "patra60",
+                    "keymap": "patra"
+                }
+            ]
+        }
+    }
 }
